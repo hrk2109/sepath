@@ -1,0 +1,4 @@
+sepath
+======
+
+sub-exon path
