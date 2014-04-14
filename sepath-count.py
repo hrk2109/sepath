@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 from collections import defaultdict
+import re
 import optparse
 import sys
 import json
@@ -51,20 +52,16 @@ def write_bed(se_ga, fn):
         for iv, ses in se_ga.steps():
             for gene_id, e_rank in ses:
                 seg_id = "%s_%s:%s" % (gene_id, e_rank[0], e_rank[1])
-                fh.write("\t".join(map(str, [iv.chrom, iv.start, iv.end, seg_id, 0, iv.strand, "\n"])))
+                fh.write("\t".join(map(str, [iv.chrom, iv.start, iv.end, seg_id, 0, 
+                                             iv.strand, "\n"])))
 
-def write_json(x, fn):
-    with open(fn, "wb") as fh:
-        json.dump(x, fh)
-
-def write_sep(sep_counts, fn):
-    with open(fn, "wb") as fh:
-        for gene_id, seps_counts in sep_counts["assigned"].iteritems():
-            for seps, count in seps_counts.iteritems():
-                ses1 = "-".join(["%s:%s" % se for _, se in seps[0]])
-                ses2 = "-".join(["%s:%s" % se for _, se in seps[1]])
-                line = "\t".join([gene_id, ses1, ses2, str(count), "\n"])
-                fh.write(line)
+def write_sep(sep_counts, fh):
+    for gene_id, seps_counts in sep_counts["assigned"].iteritems():
+        for seps, count in seps_counts.iteritems():
+            ses1 = "-".join(["%s:%s" % se for se in seps[0]])
+            ses2 = "-".join(["%s:%s" % se for se in seps[1]])
+            line = "\t".join([gene_id, ses1, ses2, str(count)]) + "\n"
+            fh.write(line)
 
 def mapped_ranges(read):
     ranges = []
@@ -79,54 +76,60 @@ def mapped_ranges(read):
 def subexonbag(read, read_chr, read_strand, mate, mate_chr, mate_strand, ga):
 
     def bag(read, read_chr, read_strand, ga):
-        subexonbag = []
+        subexonbag = set() # rngs mapping to the same sub-exon will be merged
         rngs = mapped_ranges(read)
         for rng in rngs:
             rng_iv = HTSeq.GenomicInterval(read_chr, rng[0], rng[1], read_strand)
             for iv, subexons in ga[rng_iv].steps():
-                subexonbag.extend(subexons)
+                subexonbag.update(subexons)
         return tuple(sorted(subexonbag))
 
     return tuple(sorted((bag(read, read_chr, read_strand, ga), bag(mate, mate_chr, mate_strand, ga))))
 
-
-
-
-def count_subexonbags(sam, ga, verbose=9223372036854775783):
-    sf = pysam.Samfile(sam)
+def count_subexonbags(sf, ga, progress, qc):
+    #
     reads = {}
     counts = defaultdict(int)
-    i = 0
-    for read in sf:
+    i_pair = 0
+    i_pass = 0
+    for i_any, read in enumerate(sf):
+        # LOG
+        if (i_any + 1) % progress == 0:
+            sys.stderr.write("reads: %d (processed) %d (pass QC) %d (paired) %d (unpaired)\n" %
+                             (i_any + 1, i_pass, i_pair*2, len(reads)))
+        # QC
+        if qc == "strict":
+            if not read.is_proper_pair:
+                continue
+        elif qc == "loose":
+            if read.is_unmapped or read.mate_is_unmapped:
+                continue
+        if read.is_secondary:
+            continue
+        i_pass += 1
+
         read_strand = "-" if read.is_reverse else "+"
         read_chr = sf.getrname(read.tid)
-        read_id = (read_chr, read.pos, read_strand, read.qname, read.is_read1)
+        read_id = (read_chr, read.pos, read_strand, read.qname, read.is_read2)
         mate_strand = "-" if read.mate_is_reverse else "+"
         mate_chr = sf.getrname(read.mrnm)
-        mate_id = (mate_chr, read.mpos, mate_strand, read.qname, read.is_read2)
+        mate_id = (mate_chr, read.mpos, mate_strand, read.qname, read.is_read1)
         mate = reads.pop(mate_id, None)
+
         if mate:
-            # this read was second in alignment, mate was first in alignment
-            # for stranded libraries we fix the order of the reads and invert 
-            # the strand of the second read.
+            # read was second in alignment, mate was first in alignment (irrelevant now)
+            # for stranded libraries:
+            #  - always process as (read1, read2)
+            #  - read2 is mapped to the + strand
             if read.is_read1:
-                counts[subexonbag(read, read_chr, read_strand, mate, read_chr, mate_strand, ga)] +=1
+                counts[subexonbag(read, read_chr, mate_strand, mate, mate_chr, mate_strand, ga)] +=1
             else:
-                counts[subexonbag(mate, mate_chr, mate_strand, read, mate_chr, read_strand, ga)] +=1
-
+                counts[subexonbag(mate, mate_chr, read_strand, read, read_chr, read_strand, ga)] +=1
             # log
-            i+=1
-            if i % verbose == 0:
-                sys.stderr.write("%d fragments processed.\n" % i)
-                sys.stderr.write("%d reads in queue.\n" % len(reads))
-
+            i_pair+=1
         else:
             # first read in alignment
-            if read.is_proper_pair and not read.is_secondary:
-                reads[read_id] = read
-            else:
-                print read
-
+            reads[read_id] = read
     counts = dict(counts)
     return counts
 
@@ -153,7 +156,7 @@ def counts_subexonpaths(seb_counts, se_uniq):
         for i, read_exons in enumerate(seb):
             for subexon_id in read_exons:
                 gene_id = subexon_id[0]
-                gene_subexonbags[gene_id][i].append(subexon_id)
+                gene_subexonbags[gene_id][i].append(subexon_id[1])
                 gene_subexonuniq[gene_id] += (subexon_id in se_uniq)
 
         uniqgene_ids = [g_id for g_id in gene_subexonuniq if gene_subexonuniq[g_id]]
@@ -191,7 +194,7 @@ def counts_subexonpaths(seb_counts, se_uniq):
     return sep_counts
 
 
-def main():
+if __name__ == "__main__":
 
     optParser = optparse.OptionParser( 
         usage = "%prog [options] alignment_file annotation_file",
@@ -207,9 +210,17 @@ def main():
         "Built using 'HTSeq' (%s)." % HTSeq.__version__
     )
 
-    optParser.add_option("-o", "--out", type="string", dest="out",
-                         default="", help="sub-exon path output file (tsv)"),
+    optParser.add_option("-s", "--stranded", action="store_true", dest="stranded",
+                         default=False, help="turn on strand-specific analysis (fr-firststrand)")
 
+    optParser.add_option("-q", "--qc", type="string", dest="qc",
+                         default="strict", help="read QC filtering 'strict' or 'loose'")
+
+    optParser.add_option("-o", "--out", type="string", dest="out", 
+                         help="sub-exon path output file (tsv)"),
+
+    optParser.add_option("-a", "--se_bed", type="string", dest="se_bed",
+                         help="derived sub-exon annotation (bed"),
 
     optParser.add_option("-p", "--sep_json", type="string", dest="sep_json",
                          help="full sub-exon path output file (json)"),
@@ -239,13 +250,42 @@ def main():
     
     if len(args) != 2:
         optParser.print_help()
-        #sys.exit(1)
+        sys.exit(1)
 
-    print opts
-    print args
-      
-if __name__ == "__main__":
-    main()
+    with pysam.Samfile(args[0]) as sf:
+        
+        try:
+            order = re.search("SO:(.*)", sf.text).groups()[0]
+        except Exception, e:
+            order = None
+        if not order in ("queryname", "coordinate"):
+            sys.stderr.write("error: alignment_file should be sorted by queryname (better) or coordinate.\n")
+            sys.exit(1)
+    
+        sys.stderr.write("parsing GTF file\n")
+        se_ga = parse_gtf(args[1], stranded=opts.stranded)
+
+        if opts.se_bed:
+            sys.stderr.write("writing sub-exon BED file\n")
+            write_bed(se_ga, opts.se_bed)
+
+        sys.stderr.write("counting sub-exon bags\n")
+        seb_counts = count_subexonbags(sf, se_ga, opts.progress, opts.qc)
+
+        sys.stderr.write("finding unique sub-exons\n")
+        se_unique = unique_subexons(se_ga)
+
+        sys.stderr.write("counting sub-exon paths\n")
+        sep_counts = counts_subexonpaths(seb_counts, se_unique)
+
+        out = open(opts.out) if opts.out else sys.stdout
+        write_sep(sep_counts, out)
+
+        
+# sep_counts = counts_subexonpaths(c_seb_counts, se_unique)
+
+        
+
 
 
 
@@ -255,11 +295,7 @@ if __name__ == "__main__":
 
 # gtf = "test/gencode.v19.annotation.gtf.gz"
 
-# se_ga = parse_gtf(gtf, stranded=False)
-# write_bed(se_ga, "se_ga_false.bed")
 
-# se_unique = unique_subexons(se_ga)
-# c_seb_counts = count_subexonbags(c_bam, se_ga, 1000) 
 # n_seb_counts = count_subexonbags(n_bam, se_ga, 1000) 
 # print c_seb_counts == n_seb_counts
 
