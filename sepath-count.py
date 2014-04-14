@@ -278,42 +278,6 @@ if __name__ == "__main__":
         sys.stderr.write("counting sub-exon paths\n")
         sep_counts = counts_subexonpaths(seb_counts, se_unique)
 
-        out = open(opts.out) if opts.out else sys.stdout
+        out = open(opts.out, "wb") if opts.out else sys.stdout
         write_sep(sep_counts, out)
-
-        
-# sep_counts = counts_subexonpaths(c_seb_counts, se_unique)
-
-        
-
-
-
-
-
-# c_bam = "test/bam/coordinate.bam"
-# n_bam = "test/bam/name.bam"
-
-# gtf = "test/gencode.v19.annotation.gtf.gz"
-
-
-# n_seb_counts = count_subexonbags(n_bam, se_ga, 1000) 
-# print c_seb_counts == n_seb_counts
-
-# b1 = count_subexonbags("test/sam/1.bam", se_ga) 
-# p1 = counts_subexonpaths(b1, se_unique)
-# b5 = count_subexonbags("test/sam/5.bam", se_ga) 
-# p5 = counts_subexonpaths(b5, se_unique)
-
-# b9 = count_subexonbags("test/sam/9.bam", se_ga) 
-# p9 = counts_subexonpaths(b9, se_unique)
-# b13 = count_subexonbags("test/sam/13.bam", se_ga) 
-# p13 = counts_subexonpaths(b9, se_unique)
-# b233_1 = count_subexonbags("test/sam/233_1.bam", se_ga) 
-# p233_1 = counts_subexonpaths(b233_1, se_unique)
-# b233_2 = count_subexonbags("test/sam/233_2.bam", se_ga) 
-# p233_2 = counts_subexonpaths(b233_2, se_unique)
-
-
-# sep_counts = counts_subexonpaths(c_seb_counts, se_unique)
-# se_ga_stranded = parse_gtf(gtf, stranded=True)
 
