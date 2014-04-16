@@ -210,36 +210,36 @@ if __name__ == "__main__":
         "Built using 'HTSeq' (%s)." % HTSeq.__version__
     )
 
-    optParser.add_option("-s", "--stranded", action="store_true", dest="stranded",
+    optParser.add_option("--stranded", action="store_true", dest="stranded",
                          default=False, help="turn on strand-specific analysis (fr-firststrand)")
 
-    optParser.add_option("-q", "--qc", type="string", dest="qc",
+    optParser.add_option("--qc", type="string", dest="qc",
                          default="strict", help="read QC filtering 'strict' or 'loose'")
 
-    optParser.add_option("-o", "--out", type="string", dest="out", 
+    optParser.add_option("--out", type="string", dest="out", 
                          help="sub-exon path output file (tsv)"),
 
-    optParser.add_option("-a", "--se_bed", type="string", dest="se_bed",
+    optParser.add_option("--se_bed", type="string", dest="se_bed",
                          help="derived sub-exon annotation (bed"),
 
-    optParser.add_option("-p", "--sep_json", type="string", dest="sep_json",
+    optParser.add_option("--sep_json", type="string", dest="sep_json",
                          help="full sub-exon path output file (json)"),
 
-    optParser.add_option("-b", "--seb_json", type="string", dest="seb_json",
+    optParser.add_option("--seb_json", type="string", dest="seb_json",
                          help="full sub-exon bag output file (json)"),
 
-    optParser.add_option("-e", "--eattr", type="string", dest="eattr",
+    optParser.add_option("--eattr", type="string", dest="eattr",
                          default="exon_id", help="GFF attribute to be used as exon id (default, " +
                          "suitable for Ensembl GTF files: exon_id)"),
          
-    optParser.add_option("-g", "--gattr", type="string", dest="gattr",
+    optParser.add_option("--gattr", type="string", dest="gattr",
                          default="gene_id", help="GFF attribute to be used as gene id (default, " +
                          "suitable for Ensembl GTF files: gene_id)"),
 
-    optParser.add_option("-v", "--verbose", action="store_true", dest="verbose",
+    optParser.add_option("--verbose", action="store_true", dest="verbose",
                           help="run-time messages printed to stderr")
 
-    optParser.add_option("-r", "--progress", type="int", dest="progress", default=100000,
+    optParser.add_option("--progress", type="int", dest="progress", default=100000,
                           help="progress on BAM processing printed every n lines")
 
     if len(sys.argv) == 1:
