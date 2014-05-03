@@ -122,9 +122,11 @@ def count_subexonbags(sf, ga, progress, qc):
             #  - always process as (read1, read2)
             #  - read2 is mapped to the + strand
             if read.is_read1:
-                counts[subexonbag(read, read_chr, mate_strand, mate, mate_chr, mate_strand, ga)] +=1
+                frag_strand = mate_strand
+                counts[subexonbag(read, read_chr, frag_strand, mate, mate_chr, frag_strand, ga)] +=1
             else:
-                counts[subexonbag(mate, mate_chr, read_strand, read, read_chr, read_strand, ga)] +=1
+                frag_strand = read_strand
+                counts[subexonbag(mate, mate_chr, frag_strand, read, read_chr, frag_strand, ga)] +=1
             # log
             i_pair+=1
         else:
@@ -189,7 +191,7 @@ def counts_subexonpaths(seb_counts, se_uniq):
             # unassigned - mapped outside of counting regions
             uass_counts[NULL_SEP] += seb_count
     
-    sep_counts = {"assigned":uniq_counts, "unassigned":uass_counts, 
+    sep_counts = {"assigned":   uniq_counts, "unassigned":   uass_counts, 
                   "inseparable":isep_counts, "unaccountable":uacc_counts}   
     return sep_counts
 
