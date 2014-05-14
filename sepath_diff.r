@@ -59,11 +59,10 @@ sepDivergence = function(sep_count, groups, alpha, cutoff, perc) {
     JSDg(sep_freq, groups)
 }
 
-
 loadSamples = function(fns, groups) {
     sample_data = ldply(fns, function(fn) {
         df = read.delim(fn, header=FALSE, stringsAsFactors=FALSE)
-        colnames(df) = c("gene_id", "sep1", "sep2", "count")
+        colnames(df) = c("gene_id", "sep1", "sep2", "count", "unique")
         df$sample = str_split(basename(fn), "\\.")[[1]][1]
         return(df)
     })
