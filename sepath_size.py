@@ -18,19 +18,20 @@ def write_bed(se_ga, fn):
             for gene_id, i,j,n in ses:
                 seg_id = "%s_%s:%s:%s" % (gene_id, i, j, n)
                 fh.write("\t".join(map(str, [iv.chrom, iv.start, iv.end, seg_id, 0, 
-                                             iv.strand])) + "\n")
+                                             iv.strand, "\n"])))
 
 def write_sep(seps_counts, seps_lengths, se_gl, fh):
-    fh.write("\t".join(["gene_id", "total", "unique", "sep_length", "sep1", "sep2"]) + "\n")
+    fh.write("\t".join(["gene_id", "total", "unique", "contiguous", "sep_length", "sep1", "sep2"]) + "\n")
     for gene_id, ses_counts in seps_counts.iteritems():
         #gene_length = se_gl[gene_id]
         ses_lengths = seps_lengths[gene_id]
         for ses, (total, unique) in ses_counts.iteritems():
+            contiguous = ses_lengths[ses][0]
             sep_length = ses_lengths[ses][1]
             #isize      = ses_lengths[ses][2]
             ses1 = "-".join(["%s:%s:%s" % se for se in ses[0]])
             ses2 = "-".join(["%s:%s:%s" % se for se in ses[1]])
-            line = "\t".join([gene_id, str(total), str(unique), str(sep_length), ses1, ses2]
+            line = "\t".join([gene_id, str(total), str(unique), str(contiguous), str(sep_length), ses1, ses2]
             ) + "\n"
             fh.write(line)
 
@@ -103,16 +104,7 @@ if __name__ == "__main__":
                          default="strict", help="read QC filtering 'strict' or 'loose'")
 
     optParser.add_option("--out", type="string", dest="out", 
-                         help="sub-exon path output file (cnt)"),
-
-    optParser.add_option("--bed", type="string", dest="se_bed",
-                         help="derived sub-exon annotation (bed)"),
-
-    optParser.add_option("--bag", type="string", dest="seb_json",
-                         help="full sub-exon bag output file (json)"),
-
-    optParser.add_option("--path", type="string", dest="sep_json",
-                         help="full sub-exon path output file (json)"),
+                         help="insert size output file (tsv)"),
 
     optParser.add_option("--eattr", type="string", dest="eattr",
                          default="exon_id", help="GFF attribute to be used as exon id (default, " +

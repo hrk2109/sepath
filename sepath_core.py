@@ -45,7 +45,6 @@ def parse_gtf(gtf, stranded=False):
                 n += 1
             elif j:
                 i += 1
-                n += 1
                 j = 0
 
     return se_ga, se_gm, se_gl
