@@ -3,6 +3,10 @@ library(data.table)
 library(stringr)
 library(optparse)
 
+strReverse = function(x) {
+    sapply(lapply(strsplit(x, NULL), rev), paste, collapse="")
+}
+
 loadSepTbl = function(fns) {
     tbls = lapply(fns, function(fn) {
         df = fread(fn)
@@ -15,15 +19,15 @@ loadSepTbl = function(fns) {
 
 loadBed = function(bedfn) {
     bed = read.delim(bedfn, sep="\t", header=FALSE, stringsAsFactors=FALSE)
-    colnames(bed) = c("chr", "start", "end", "name", "strand")
-    gene_length = sapply(split(bed$end-bed$start, sapply(str_split(bed$name, "_"), "[", 1)), sum)
-    list(bed=bed, gene_length=gene_length)
+    colnames(bed) = c("chr", "start", "end", "name", "score", "strand")
+    return(bed)
 }
 
 seTbl = function(sep, bed) {
-    gse = data.table(data.frame(do.call("rbind", str_split(bed$bed$name, "_")), stringsAsFactors=FALSE))
-    setnames(gse, c("gene_id", "sep"))
-    gse$length = bed$bed$end - bed$bed$start
+    splits = str_split(strReverse(bed$name), "_", 2)    
+    gse = data.table(gene_id=strReverse(sapply(splits, "[" ,2)),
+                         sep=strReverse(sapply(splits, "[" ,1)))
+    gse$length = bed$end - bed$start
     setkey(gse, "gene_id", "sep")
     seps = lapply(str_split(paste(sep$sep1, sep$sep2, sep="-"), "-"), function(x) unique(x[x!=""]))
     unrolled_seps = unlist(seps)
@@ -32,13 +36,15 @@ seTbl = function(sep, bed) {
     unrolled_sep$sep = unrolled_seps
     counts = unrolled_sep[, list(total=sum(total),unique=sum(unique)), by=list(gene_id, sep, sample)]
     setkey(counts, "gene_id", "sep", "sample")
-    se = merge(counts, gse)
+    se = merge(counts, gse, all.y=TRUE)
+    se$sample = unique(counts$sample)
+    se[is.na(se)] = 0
     return(se)
 }
 
 seLength = function(se, quant=0.5, rl=100) {
     sel = copy(se) # copy
-    sel[,nfpb:=total/(length+(2*rl))]
+    sel[,nfpb:=(total+1)/(length+(2*rl))]
     sel[,se_weight:=pmin(1.0, nfpb/quantile(nfpb, quant)), by=list(gene_id, sample)]
     sel[,elength:=length*se_weight,by=list(gene_id, sample)]
     setkey(sel, gene_id, sample)
@@ -46,7 +52,7 @@ seLength = function(se, quant=0.5, rl=100) {
 }
 
 fpkm = function(sep, sel) {
-    lent = sel[,list(length=sum(length), elength=sum(elength)),by=list(gene_id, sample)]
+    lent = sel[,list(length=as.numeric(sum(length)), elength=sum(elength)),by=list(gene_id, sample)]
     gent = sep[, list(gene_total=sum(total)), by=list(sample, gene_id)]
     setkey(lent, gene_id, sample)
     setkey(gent, gene_id, sample)
@@ -72,7 +78,7 @@ parser = OptionParser("%prog [options] bed_file cnt_file",
                 metavar="out"),
         make_option(c("--quant"), type="numeric", default=0.5,
                 help="Exon coverage penalty quantile [default: %default]",
-                metavar="quant"),
+                    metavar="quant"),
         make_option(c("--rl"), type="numeric", default=100,
                 help="Averaged read length [default: %default]",
                 metavar="quant"),
@@ -90,11 +96,15 @@ if (length(opt$args) != 2) {
     quit("no", 1)
 }
 
+write("info: loading BED file", stderr())
 bed = loadBed(opt$args[1])
+write("info: loading CNT file", stderr())
 sep = loadSepTbl(opt$args[2])
-
+write("info: computing exon counts", stderr())
 se = seTbl(sep, bed)
+write("info: computing corrected exon lengths", stderr())
 sel = seLength(se, quant=opt$options$quant, rl=opt$options$rl)
+write("info: computing FPKM", stderr())
 res = fpkm(sep, sel)
 
 df = res[,c("gene_id", "fpkm", "efpkm"),with=FALSE]
@@ -103,3 +113,6 @@ if (opt$options$out == "stdout") {
 } else {
     write.table(df, opt$options$out, sep="\t", quote=FALSE, col.names=TRUE, row.names=FALSE)
 }
+
+
+

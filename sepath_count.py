@@ -96,6 +96,9 @@ if __name__ == "__main__":
     optParser.add_option("--stranded", action="store_true", dest="stranded",
                          default=False, help="turn on strand-specific analysis (fr-firststrand)")
 
+    optParser.add_option("--mmcut", type="int", dest="mmcut", default=1,
+                          help="Do not count fragments that map to more than 'mmcut' locations")
+
     optParser.add_option("--unique", action="store_true", dest="unique",
                          default=False, help="count unique fragments per sub-exon path")
 
@@ -160,7 +163,8 @@ if __name__ == "__main__":
         se_unique = unique_subexons(se_ga)
 
         sys.stderr.write("info: processing BAM file\n")
-        seb_cargos = scanBAM(sf, se_ga, count, opts.progress, opts.qc, "fragment" if opts.unique else None)
+        seb_cargos = scanBAM(sf, se_ga, count, opts.progress, opts.qc, 
+                             "fragment" if opts.unique else None, opts.mmcut)
 
         sys.stderr.write("info: calculating sub-exon paths\n")
         sep_cargos = seb2sep(seb_cargos, se_unique)

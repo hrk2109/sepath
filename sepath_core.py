@@ -103,7 +103,7 @@ def subexonpath(seb, se_uniq):
         sep = None
     return sep
 
-def scanBAM(sf, ga, func, progress, qc, split_mode):
+def scanBAM(sf, ga, func, progress, qc, split_mode, mmcut):
     split = (None, None, None, None)
     reads = {}
     cargo = defaultdict(lambda: defaultdict(int))
@@ -135,6 +135,9 @@ def scanBAM(sf, ga, func, progress, qc, split_mode):
         j_read_strand = "-" if i_read.mate_is_reverse else "+"
 
         if i_read_strand == j_read_strand:
+            continue
+
+        if dict(i_read.tags).get("NH", 1) > mmcut:
             continue
 
         i_read_id = (i_read_chr, i_read.pos,  i_read_strand, i_read.qname, i_read.is_read2)

@@ -1,3 +1,5 @@
+sim/
+.nfs*
 attic/
 test/
 libs/
