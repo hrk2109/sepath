@@ -60,21 +60,13 @@ def measure_subexonpaths(seps, se_gm):
                     sep_length = sum(set(chain.from_iterable(ses_lengths)))
                 else:
                     sep_length = float("nan")
-                    # inserts = [sep_length - (start - se_gm[(gene_id,) + first_left].start) - \
-                    #                             (se_gm[(gene_id,) + last_right].end - end) for \
-                    #            (chr, start, end, strand), count in cargo.iteritems()]
-                    # isize = "%d:%d:%s:%s" % (numpy.mean(inserts), numpy.std(inserts), 
-                    #                          min(inserts), max(inserts))
             except IndexError:
                 contiguous = False
                 sep_length = float("nan")
-                #isize = "nan:nan:nan:nan"
             lengths[gene_id][ses] = \
                 (
                     contiguous,
                     sep_length,
-                    #isize,
-                    #ses_lengths
                 )
     return lengths
 
@@ -165,7 +157,8 @@ if __name__ == "__main__":
         se_unique = unique_subexons(se_ga)
 
         sys.stderr.write("info: processing BAM file\n")
-        seb_cargos = scanBAM(sf, se_ga, count, opts.progress, opts.qc, 
+        cargo = defaultdict(lambda: defaultdict(int))
+        seb_cargos = scanBAM(sf, se_ga, count, cargo, opts.progress, opts.qc, 
                              "fragment" if opts.unique else None, opts.mmcut)
 
         sys.stderr.write("info: calculating sub-exon paths\n")

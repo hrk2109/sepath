@@ -97,16 +97,15 @@ def subexonpath(seb, se_uniq):
         gene_id = uniqgene_ids.pop()
         seb = gene_subexonbags[gene_id]
         path = tuple(sorted([tuple(sorted(seb[0])), 
-                            tuple(sorted(seb[1]))]))
+                             tuple(sorted(seb[1]))]))
         sep = (gene_id, path)
     else:
         sep = None
     return sep
 
-def scanBAM(sf, ga, func, progress, qc, split_mode, mmcut):
+def scanBAM(sf, ga, func, cargo, progress, qc, split_mode, mmcut, pass_limit=float("inf")):
     split = (None, None, None, None)
     reads = {}
-    cargo = defaultdict(lambda: defaultdict(int))
     i_pair = 0
     i_pass = 0
     for i_any, i_read in enumerate(sf):
@@ -114,6 +113,8 @@ def scanBAM(sf, ga, func, progress, qc, split_mode, mmcut):
         if (i_any + 1) % progress == 0:
             sys.stderr.write("reads: %d (processed) %d (pass QC) %d (paired) %d (unpaired)\n" %
                              (i_any + 1, i_pass*2, i_pair*2, len(reads)))
+            if i_pass > pass_limit:
+                break
         # QC
         if qc == "strict":
             if not i_read.is_proper_pair:
@@ -170,19 +171,18 @@ def scanBAM(sf, ga, func, progress, qc, split_mode, mmcut):
             seb = subexonbag(i_read, frag_chr, frag_strand, j_read, frag_chr, frag_strand, ga)
             # i_read was second in alignment, j_read was first in alignment
             # there is no information associated with this order.
-            if split_mode == "fragment":
-                frag_start = min(i_read.positions[0], j_read.positions[0])
-                frag_end = max(i_read.positions[-1], j_read.positions[-1])
+            if split_mode == "fragment" or "qname":
+                frag_start = min(i_read.positions[0],  j_read.positions[0])
+                frag_end  =  max(i_read.positions[-1], j_read.positions[-1])
                 split = (frag_chr, frag_start, frag_end, frag_strand)
-            elif split_mode == "qname":
-                split = i_read.qname
-            
-            ##
+            if split_mode == "qname":
+                split = split + (i_read.qname,)
+
             func(cargo, seb, split)
         else:
             # first read in alignment
             reads[i_read_id] = i_read
-    return dict(cargo)
+    return cargo
 
 def seb2sep(seb_cargos, se_uniq):
 
