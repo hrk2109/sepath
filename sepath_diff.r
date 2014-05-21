@@ -2,6 +2,7 @@
 library(plyr)
 library(stringr)
 library(optparse)
+library(data.table)
 library(MultinomialCI)
 
 shannonEntropy = function(freq, base=2) {
@@ -61,8 +62,7 @@ sepDivergence = function(sep_count, groups, alpha, cutoff, perc) {
 
 loadSamples = function(fns, groups) {
     sample_data = ldply(fns, function(fn) {
-        df = read.delim(fn, header=FALSE, stringsAsFactors=FALSE)
-        colnames(df) = c("gene_id", "sep1", "sep2", "count", "unique")
+        df = read.delim(fn, header=TRUE, stringsAsFactors=FALSE)
         df$sample = str_split(basename(fn), "\\.")[[1]][1]
         return(df)
     })
@@ -75,7 +75,7 @@ loadSamples = function(fns, groups) {
 sepCounts = function(df) {
     sep_counts = dlply(df, c("gene_id"), function(gdf) {
         ggdf = dlply(gdf, c("sample"), function(sdf) {
-            gd = data.frame(matrix(sdf$count, ncol=nrow(sdf)))
+            gd = data.frame(matrix(sdf$total, ncol=nrow(sdf)))
             colnames(gd) = paste(sdf$sep1, sdf$sep2, sep="--")
             rownames(gd) = sdf$sample[[1]]
             return(gd)
@@ -87,6 +87,9 @@ sepCounts = function(df) {
     })
     return(sep_counts)
 }           
+
+
+dd = aa[,list(.GRP),by=list(gene_id, sample)][10:20]
 
 sepDivergences = function(samples, alpha=0.05, cutoff=0, perc=1/3) {
     sep_counts = sepCounts(samples[[1]])

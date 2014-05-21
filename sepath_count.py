@@ -55,9 +55,11 @@ def measure_subexonpaths(seps, se_gm):
                 last_left = ses[0][-1]
                 first_right = ses[1][0]
                 last_right = ses[1][-1]
-                contiguous = (-5 <= first_right[-1] - last_left[-1] <= 1)
+                contiguous = (first_right[-1] - last_left[-1] <= 1)
                 if contiguous:
                     sep_length = sum(set(chain.from_iterable(ses_lengths)))
+                else:
+                    sep_length = float("nan")
                     # inserts = [sep_length - (start - se_gm[(gene_id,) + first_left].start) - \
                     #                             (se_gm[(gene_id,) + last_right].end - end) for \
                     #            (chr, start, end, strand), count in cargo.iteritems()]
