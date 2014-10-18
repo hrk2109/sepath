@@ -25,29 +25,22 @@ if __name__ == "__main__":
 
     )
 
-    optParser.add_option("--stranded", action="store_true", dest="stranded",
-                         default=False, help="turn on strand-specific analysis (fr-firststrand)")
-
-    optParser.add_option("--qc", type="string", dest="qc",
-                         default="strict", help="read QC filtering 'strict' or 'loose'")
-
+    optParser.add_option("--sr", type="int", dest="strand_read", default=0,
+                         help="0 (unstranded), 1 (fr-secondstrand), or 2 (fr-firststrand)")
+    optParser.add_option("--qc", type="string", dest="qc", default="strict", 
+                         help="read QC filtering 'strict' or 'loose'")
     optParser.add_option("--n", type="int", dest="n", default=100000,
-                          help="minimum number of fragments to process")
-
+                         help="minimum number of fragments to process")
     optParser.add_option("--out", type="string", dest="out", 
                          help="insert size output file (tsv)"),
-
     optParser.add_option("--eattr", type="string", dest="eattr",
-                         default="exon_id", help="GFF attribute to be used as exon id (default, " +
+                         default="exon_id", help="GTF attribute to be used as exon id (default, " +
                          "suitable for Ensembl GTF files: exon_id)"),
-         
     optParser.add_option("--gattr", type="string", dest="gattr",
-                         default="gene_id", help="GFF attribute to be used as gene id (default, " +
+                         default="gene_id", help="GTF attribute to be used as gene id (default, " +
                          "suitable for Ensembl GTF files: gene_id)"),
-
     optParser.add_option("--verbose", action="store_true", dest="verbose",
                           help="run-time messages printed to stderr")
-
     optParser.add_option("--progress", type="int", dest="progress", default=100000,
                           help="progress on BAM processing printed every n lines")
 
@@ -72,7 +65,7 @@ if __name__ == "__main__":
                              "Alignment_file should be sorted by queryname (better) or coordinate.\n")
     
         sys.stderr.write("info: parsing GTF file\n")
-        se_ga, se_gm, se_gl, se_gs = parse_gtf(args[1], stranded=opts.stranded)
+        se_ga, se_gm, se_gl, se_gs = parse_gtf(args[1], stranded=opts.strand_read != 0)
 
         sys.stderr.write("info: finding unique sub-exons\n")
         se_unique = unique_subexons(se_ga)
@@ -82,8 +75,6 @@ if __name__ == "__main__":
             if sep:
                 gene_id = sep[0]
                 ses = sep[1]
-                print ses
-                blkjl
                 try:
                     first_left = ses[0][0]
                     last_left = ses[0][-1]
@@ -114,7 +105,7 @@ if __name__ == "__main__":
             return cargo
 
         sys.stderr.write("info: processing BAM file\n")
-        cargo = scanBAM(sf, se_ga, count, [], opts.progress, opts.qc, "qname", 1, opts.n)
+        cargo = scanBAM(sf, se_ga, count, [], opts.progress, opts.qc, "qname", 1,opts.strand_read, opts.n)
 
         sys.stderr.write("info: writing tsv file '%s'\n" % opts.out)
         out = open(opts.out, "wb") if opts.out else sys.stdout

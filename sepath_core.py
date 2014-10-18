@@ -105,11 +105,16 @@ def subexonpath(seb, se_uniq):
         sep = None
     return sep
 
-def scanBAM(sf, ga, func, cargo, progress, qc, split_mode, mmcut, pass_limit=sys.maxint):
+def scanBAM(sf, ga, func, cargo, progress, qc, split_mode, mmcut, strand_read, pass_limit=sys.maxint):
     split = (None, None, None, None)
     reads = {}
     i_pair = 0
     i_pass = 0
+
+    # For stranded libraries:
+    #  - read2 is from the "+" strand
+    want_read2 = strand_read == 2
+
     for i_any, i_read in enumerate(sf):
         # LOG
         if (i_any + 1) % progress == 0:
@@ -166,9 +171,8 @@ def scanBAM(sf, ga, func, cargo, progress, qc, split_mode, mmcut, pass_limit=sys
                 
             i_pass+=1
 
-            # For stranded libraries:
-            #  - read2 is from the "+" strand
-            frag_chr, frag_strand = (i_read_chr, i_read_strand) if i_read.is_read2 else \
+            frag_chr, frag_strand = (i_read_chr, i_read_strand) \
+                                    if i_read.is_read2 and want_read2 else \
                                     (j_read_chr, j_read_strand)
             seb = subexonbag(i_read, frag_chr, frag_strand, j_read, frag_chr, frag_strand, ga)
             # i_read was second in alignment, j_read was first in alignment

@@ -89,21 +89,18 @@ if __name__ == "__main__":
                 except IndexError:
                     return
                     
+                l_se = (gene_id,) + first_left
+                r_se = (gene_id,) + last_right
+                first_sep = se_gm[l_se]
+                last_sep = se_gm[r_se]
                 start = split[1]
                 end = split[2]
-
-                contiguous = (first_right[-1] - last_left[-1] <= 1)
-
-                first_sep = se_gm[(gene_id,) + first_left]
-                last_sep = se_gm[(gene_id,) + last_right]
 
                 enclosed = \
                     (first_sep.start < start < first_sep.end) and \
                     (last_sep.start  <   end < last_sep.end)
 
                 if enclosed:
-                    l_se = (gene_id,) + first_left
-                    r_se = (gene_id,) + last_right
                     gsg = se_gs[gene_id]
                     l_tail = sum([se_gm[n].length for n in gsg[:gsg.index(l_se)]])
                     r_tail = sum([se_gm[n].length for n in gsg[gsg.index(r_se)+1:]])
@@ -111,6 +108,8 @@ if __name__ == "__main__":
                     r_dist = se_gm[r_se].end - end
                     l_gap = l_tail + l_dist
                     r_gap = r_tail + r_dist
+
+                    contiguous = (first_right[-1] - last_left[-1] <= 1)
                     if contiguous:
                         ses_lengths = [[se_gm[(gene_id,) + se].length for se in sei] for sei in ses]
                         sep_length = sum(set(chain.from_iterable(ses_lengths)))
