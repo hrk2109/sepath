@@ -1,11 +1,9 @@
 #!/usr/bin/env python2
 from sepath_core import *
 from itertools import chain
-# import re
-# import numpy
+import re
 import optparse
 import sys
-# import json
 import pysam
 import HTSeq
 
@@ -77,9 +75,9 @@ if __name__ == "__main__":
         usage = "%prog [options] alignment_file annotation_file",
         
         description = \
-        "This script takes a paired-end 'alignment_file' in BAM/SAM format and a" +
+        "This script takes a paired-end 'alignment_file' in BAM/SAM format and an" +
         "'annotation_file' in GTF/GFF format and counts how many times a fragment was" +
-        "mapped to a specific order of sub-exons a.k.a its sub-exon path",
+        "mapped to a specific order of sub-exons a.k.a the reads sub-exon path",
         
         epilog = \
         "Written by Marcin Cieslik (mcieslik@med.umich.edu) " +
@@ -147,7 +145,7 @@ if __name__ == "__main__":
                              "Alignment_file should be sorted by queryname (better) or coordinate.\n")
     
         sys.stderr.write("info: parsing GTF file\n")
-        se_ga, se_gm, se_gl = parse_gtf(args[1], stranded=opts.stranded)
+        se_ga, se_gm, se_gl, se_gs = parse_gtf(args[1], stranded=opts.stranded)
 
         if opts.se_bed:
             sys.stderr.write("info: writing sub-exon BED file\n")

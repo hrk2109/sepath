@@ -3,7 +3,22 @@ library(plyr)
 library(stringr)
 library(optparse)
 library(data.table)
+# library(parallel)
+# library(doMC)
+# registerDoMC(detectCores())
 library(MultinomialCI)
+
+merge.list =function (x, y, ...) {
+    if (length(x) == 0) 
+        return(y)
+    if (length(y) == 0) 
+        return(x)
+    i = match(names(y), names(x))
+    i = is.na(i)
+    if (any(i)) 
+        x[names(y)[which(i)]] = y[which(i)]
+    x
+}
 
 shannonEntropy = function(freq, base=2) {
     tmp = log(freq, base)
@@ -42,22 +57,30 @@ JSDg = function(freq, groups, weights=rep(1/nrow(freq), nrow(freq)), base=2) {
     H_avg_freq - avg_H_freq
 }
 
-sepDivergence = function(sep_count, groups, alpha, cutoff, perc) {
-    ## For each sample determine which seps are 
-    ## present above 'cutoff' in at least 'perc'
+sepDivergence = function(sep_count, groups, alpha, sepcut, rowcut, colcut) {
+    ## For each sample determine which seps are present above 'sepcut' in at least 'colcut'
+    ## samples. And which samples contain at least 'rowcut' 
     ## at a 'alpha' false positive rate
     sep_count = as.matrix(sep_count)
     tmp = alply(sep_count, 1, function(row) {
-        multinomialCI(row, alpha)[,1]
-    })
+        if (sum(row) >= length(row)) {
+            multinomialCI(row, alpha)[,1]
+        } else {
+            rep(0, length(row))
+        }
+    }, .parallel=TRUE)
     low = splat(rbind)(tmp)
-    sep_pass = colSums(low > cutoff) >= (perc * nrow(sep_count))
-    sep_count_pass = sep_count[,sep_pass,drop=FALSE]    
+    ## filter
+    lowcut = (low > sepcut)
+    col_pass = colSums(lowcut) > (colcut * nrow(low))
+    row_pass = rowSums(lowcut) > (rowcut * ncol(low))
+    sep_count_pass = sep_count[row_pass,col_pass,drop=FALSE]
+    groups_pass = groups[row_pass]
     ## transform rows of counts into rows of frequencies
     gene_sample_coverage = rowSums(sep_count_pass)
     sep_freq = sweep(sep_count_pass, 1, gene_sample_coverage, "/")
     ## calculate groupwise JSD
-    JSDg(sep_freq, groups)
+    JSDg(sep_freq, groups_pass)
 }
 
 loadSamples = function(fns, groups) {
@@ -73,6 +96,7 @@ loadSamples = function(fns, groups) {
 }
 
 sepCounts = function(df) {
+    samples = unique(df$sample)
     sep_counts = dlply(df, c("gene_id"), function(gdf) {
         ggdf = dlply(gdf, c("sample"), function(sdf) {
             gd = data.frame(matrix(sdf$total, ncol=nrow(sdf)))
@@ -83,20 +107,19 @@ sepCounts = function(df) {
         res = splat(rbind.fill)(ggdf)
         res[is.na(res)] = 0
         rownames(res) = unlist(lapply(ggdf, row.names))
+        res[setdiff(samples, rownames(res)),] = 0
+        res = res[samples,]
         return(res)
-    })
+    }, .parallel=TRUE)
     return(sep_counts)
 }           
 
-
-dd = aa[,list(.GRP),by=list(gene_id, sample)][10:20]
-
-sepDivergences = function(samples, alpha=0.05, cutoff=0, perc=1/3) {
+sepDivergences = function(samples, alpha=0.05, sepcut=0, colcut=1/3, rowcut=1/10) {
     sep_counts = sepCounts(samples[[1]])
     groups = samples[[2]]
     llply(sep_counts, function(sep_count) {
         gene_groups = groups[rownames(sep_count),]
-        sepDivergence(sep_count, gene_groups, alpha=alpha, cutoff=cutoff, perc=perc)
+        sepDivergence(sep_count, gene_groups, alpha=alpha, sepcut=sepcut, rowcut=rowcut, colcut=colcut)
     })
 }
     
@@ -114,10 +137,19 @@ option_list = list(
                 help="confidence level [default: %default]",
                 metavar="alpha"),
 
-    make_option(c("--cutoff"), type="numeric", default=0.00,
-                help="cutoff [default: %default]",
+    make_option(c("--sepcut"), type="numeric", default=0,
+                help="sep cut-off [default: %default]",
                 metavar="cutoff"),
 
+    make_option(c("--colcut"), type="numeric", default=0,
+                help="col cut-off [default: %default]",
+                metavar="cutoff"),
+
+    make_option(c("--rowcut"), type="numeric", default=0,
+                help="row cut-off [default: %default]",
+                metavar="cutoff"),
+
+    
     make_option(c("--fract"), type="numeric", default=0.33,
                 help="fract [default: %default]",
                 metavar="fract")
@@ -163,7 +195,6 @@ if (length(opt$args) != length(groups)) {
 
 samples = loadSamples(opt$args, groups)
 sepdiv = sepDivergences(samples)
-
 df = data.frame(SEPDIV=as.matrix(unlist(sepdiv)))
 
 if (opt$options$out == "stdout") {

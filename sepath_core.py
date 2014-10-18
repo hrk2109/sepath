@@ -29,16 +29,18 @@ def parse_gtf(gtf, stranded=False):
     
     se_ga = HTSeq.GenomicArrayOfSets("auto", stranded=stranded)
     se_gm = {}
+    se_gs = defaultdict(list)
     se_gl = defaultdict(int)
     
     for gene_id, g_iv in g_ivs.iteritems():
         # exon, subexon, n
         i, j, n = 0, 0, 0
         for ge_iv, ge_ids in ges_ga[g_iv].steps():            
-            g_ids = [g_id for g_id, e_id in ge_ids]
+            g_ids = [g_id for g_id, _ in ge_ids]
             if gene_id in g_ids:
                 se_gl[gene_id] += ge_iv.length
                 se = (gene_id, i, j, n)
+                se_gs[gene_id].append(se)
                 se_ga[ge_iv] += se
                 se_gm[se] = ge_iv
                 j += 1
@@ -47,7 +49,7 @@ def parse_gtf(gtf, stranded=False):
                 i += 1
                 j = 0
 
-    return se_ga, se_gm, se_gl
+    return se_ga, se_gm, se_gl, dict(se_gs)
 
 def unique_subexons(ga):
     se_uniq = set()
@@ -103,7 +105,7 @@ def subexonpath(seb, se_uniq):
         sep = None
     return sep
 
-def scanBAM(sf, ga, func, cargo, progress, qc, split_mode, mmcut, pass_limit=float("inf")):
+def scanBAM(sf, ga, func, cargo, progress, qc, split_mode, mmcut, pass_limit=sys.maxint):
     split = (None, None, None, None)
     reads = {}
     i_pair = 0

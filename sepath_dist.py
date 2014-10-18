@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 from sepath_core import *
-from itertools import chain, islice
+from itertools import chain, islice, izip
 import re
 import optparse
 import sys
@@ -14,15 +14,15 @@ if __name__ == "__main__":
         
         description = \
         "This script takes a paired-end 'alignment_file' in BAM/SAM format and an" +
-        "'annotation_file' in GTF/GFF format and calculates the summary statistics" +
-        "of insert sizes defined as the distance from the start of the left read" +
-        "to the end of the right read in transcript cooredinates",
+        "'annotation_file' in GTF/GFF format and for each fragment calculates the distances:" +
+        "(1) start of left read to end of right read i.e. insert size," + 
+        "(2) start of gene to start of left read," + 
+        "(3) end of right read to end of gene",
 
         epilog = \
         "Written by Marcin Cieslik (mcieslik@med.umich.edu) " +
         "Michigan Center for Translational Pathology (c) 2014 " +
         "Built using 'HTSeq' (%s)." % HTSeq.__version__
-
     )
 
     optParser.add_option("--stranded", action="store_true", dest="stranded",
@@ -31,11 +31,11 @@ if __name__ == "__main__":
     optParser.add_option("--qc", type="string", dest="qc",
                          default="strict", help="read QC filtering 'strict' or 'loose'")
 
-    optParser.add_option("--n", type="int", dest="n", default=100000,
+    optParser.add_option("--n", type="int", dest="n", default=sys.maxint,
                           help="minimum number of fragments to process")
 
     optParser.add_option("--out", type="string", dest="out", 
-                         help="insert size output file (tsv)"),
+                         help="distance output file (dst)"),
 
     optParser.add_option("--eattr", type="string", dest="eattr",
                          default="exon_id", help="GFF attribute to be used as exon id (default, " +
@@ -62,7 +62,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     with pysam.Samfile(args[0]) as sf:
-        
         try:
             order = re.search("SO:(.*)", sf.text).groups()[0]
         except Exception, e:
@@ -70,7 +69,7 @@ if __name__ == "__main__":
         if not order in ("queryname", "coordinate"):
             sys.stderr.write("warning: missing SO SAM header flag. " +\
                              "Alignment_file should be sorted by queryname (better) or coordinate.\n")
-    
+
         sys.stderr.write("info: parsing GTF file\n")
         se_ga, se_gm, se_gl, se_gs = parse_gtf(args[1], stranded=opts.stranded)
 
@@ -82,8 +81,6 @@ if __name__ == "__main__":
             if sep:
                 gene_id = sep[0]
                 ses = sep[1]
-                print ses
-                blkjl
                 try:
                     first_left = ses[0][0]
                     last_left = ses[0][-1]
@@ -104,25 +101,30 @@ if __name__ == "__main__":
                     (first_sep.start < start < first_sep.end) and \
                     (last_sep.start  <   end < last_sep.end)
 
-                if contiguous and enclosed:
-                    ses_lengths = [[(se_gm[(gene_id,) + se]).length for se in sei] for sei in ses]
-                    sep_length = sum(set(chain.from_iterable(ses_lengths)))
-                    insert = sep_length - (start - se_gm[(gene_id,) + first_left].start) - \
-                                          (se_gm[(gene_id,) + last_right].end - end)
-                    cargo.append(insert)
-                    
-            return cargo
+                if enclosed:
+                    l_se = (gene_id,) + first_left
+                    r_se = (gene_id,) + last_right
+                    gsg = se_gs[gene_id]
+                    l_tail = sum([se_gm[n].length for n in gsg[:gsg.index(l_se)]])
+                    r_tail = sum([se_gm[n].length for n in gsg[gsg.index(r_se)+1:]])
+                    l_dist = start - se_gm[l_se].start
+                    r_dist = se_gm[r_se].end - end
+                    l_gap = l_tail + l_dist
+                    r_gap = r_tail + r_dist
+                    if contiguous:
+                        ses_lengths = [[se_gm[(gene_id,) + se].length for se in sei] for sei in ses]
+                        sep_length = sum(set(chain.from_iterable(ses_lengths)))
+                        insert = sep_length - l_dist - r_dist
+                    else:
+                        insert = -1
+                    cargo["gene"].append(gene_id)
+                    cargo["data"].append((insert, l_gap, r_gap))
 
         sys.stderr.write("info: processing BAM file\n")
-        cargo = scanBAM(sf, se_ga, count, [], opts.progress, opts.qc, "qname", 1, opts.n)
-
-        sys.stderr.write("info: writing tsv file '%s'\n" % opts.out)
+        cargo = scanBAM(sf, se_ga, count, {"gene":[], "data": []}, opts.progress, opts.qc, "qname", 1, opts.n)
+        sys.stderr.write("info: writing dst file '%s'\n" % opts.out)
         out = open(opts.out, "wb") if opts.out else sys.stdout
-        
-        std = numpy.std(cargo)
-        avg = numpy.mean(cargo)
-        med = numpy.median(cargo)
-        n = len(cargo)
-        out.write("n\t%s\nmean\t%.2f\nstd\t%.2f\nmed\t%.2f\n" % (n, avg, std, med))
+        for gene, data in izip(cargo["gene"], cargo["data"]):
+            out.write("%s\t%d\t%d\t%d\n" % ((gene,) + data))
         out.close()
 
